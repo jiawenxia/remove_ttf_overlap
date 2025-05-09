@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let selectedFile = null;
     let currentWorkflowRunId = null;
-    let repoOwner = 'jiawenxia'; // 替换为你的GitHub用户名
-    let repoName = 'remove_ttf_overlap'; // 替换为你的仓库名
+    let repoOwner = 'jiawenxia'; // 您的GitHub用户名
+    let repoName = 'remove_ttf_overlap'; // 您的仓库名
     
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
@@ -36,8 +36,14 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // 检查文件大小 - GitHub有请求大小限制
+        if (selectedFile.size > 25 * 1024 * 1024) { // 25MB
+            showStatus('error', '文件太大，无法通过API处理。请使用小于25MB的文件。');
+            return;
+        }
+        
         // 显示处理状态
-        showStatus('info', '正在上传字体文件...');
+        showStatus('info', '正在准备字体文件...');
         processBtn.disabled = true;
         
         try {
@@ -63,26 +69,51 @@ document.addEventListener('DOMContentLoaded', function() {
             
             showStatus('info', '正在触发字体处理...');
             
-            // 使用用户提供的 token 调用 GitHub API
+            // 调试输出请求详情（不含敏感信息）
+            console.log("发送请求到:", `https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/dispatches`);
+            console.log("请求体:", {
+                ref: workflowData.ref,
+                inputs: {
+                    fileName: workflowData.inputs.fileName,
+                    keepHinting: workflowData.inputs.keepHinting,
+                    ignoreErrors: workflowData.inputs.ignoreErrors,
+                    keepVars: workflowData.inputs.keepVars,
+                    fontBase64: '(base64 数据太长，已省略)'
+                }
+            });
+            
+            // 发送API请求
             const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/dispatches`, {
                 method: 'POST',
                 headers: {
-                    'Authorization': `token ${githubToken}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json',
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify(workflowData)
             });
             
-            // GitHub 的工作流调度 API 通常返回 204 No Content
-            if (response.status !== 204) {
-                throw new Error(`GitHub API 返回了状态码 ${response.status}`);
+            // 更详细的错误处理
+            if (!response.ok) {
+                let errorText = '';
+                try {
+                    const errorData = await response.json();
+                    errorText = JSON.stringify(errorData);
+                } catch (e) {
+                    errorText = await response.text();
+                }
+                throw new Error(`GitHub API 返回了状态码 ${response.status}: ${errorText}`);
             }
             
             // 获取最新的工作流运行信息
-            const runsResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/runs`, {
+            showStatus('info', '字体处理已触发，正在获取运行信息...');
+            
+            // 等待几秒钟确保工作流已创建
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            const runsResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/runs?per_page=1`, {
                 headers: {
-                    'Authorization': `token ${githubToken}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             });
@@ -95,7 +126,8 @@ document.addEventListener('DOMContentLoaded', function() {
             if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
                 currentWorkflowRunId = runsData.workflow_runs[0].id;
             } else {
-                currentWorkflowRunId = 'unknown';
+                currentWorkflowRunId = '未知';
+                showStatus('info', '工作流已触发，但无法获取运行ID。请在GitHub Actions页面查看。');
             }
             
             // 显示结果区域
@@ -104,6 +136,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             const actionUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}`;
             actionLinkElement.href = actionUrl;
+            actionLinkElement.textContent = '查看运行详情';
             
             showStatus('success', '已成功触发字体处理，请查看GitHub Action运行详情。');
             
@@ -118,7 +151,7 @@ document.addEventListener('DOMContentLoaded', function() {
     });
     
     checkStatusBtn.addEventListener('click', async function() {
-        if (!currentWorkflowRunId || currentWorkflowRunId === 'unknown') {
+        if (!currentWorkflowRunId || currentWorkflowRunId === '未知') {
             showStatus('error', '无法检查状态：未知的工作流运行ID');
             return;
         }
@@ -136,13 +169,20 @@ document.addEventListener('DOMContentLoaded', function() {
         try {
             const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}`, {
                 headers: {
-                    'Authorization': `token ${githubToken}`,
+                    'Authorization': `Bearer ${githubToken}`,
                     'Accept': 'application/vnd.github.v3+json'
                 }
             });
             
             if (!response.ok) {
-                throw new Error('无法获取工作流状态');
+                let errorText = '';
+                try {
+                    const errorData = await response.json();
+                    errorText = JSON.stringify(errorData);
+                } catch (e) {
+                    errorText = await response.text();
+                }
+                throw new Error(`GitHub API 返回了状态码 ${response.status}: ${errorText}`);
             }
             
             const data = await response.json();
@@ -154,7 +194,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const artifactsUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}/artifacts`;
                 const artifactsResponse = await fetch(artifactsUrl, {
                     headers: {
-                        'Authorization': `token ${githubToken}`,
+                        'Authorization': `Bearer ${githubToken}`,
                         'Accept': 'application/vnd.github.v3+json'
                     }
                 });
