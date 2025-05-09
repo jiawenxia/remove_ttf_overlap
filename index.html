@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>字体去重叠工具</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>字体去重叠工具</h1>
+        
+        <div class="info-box">
+            此工具可以处理 TrueType/OpenType 字体文件，移除字形中的重叠部分。
+        </div>
+        
+        <div class="upload-section">
+            <div class="upload-container">
+                <label for="font-upload" class="upload-btn">选择字体文件</label>
+                <input type="file" id="font-upload" accept=".ttf,.otf">
+                <div id="file-name"></div>
+            </div>
+            
+            <div class="options">
+                <div class="checkbox-container">
+                    <input type="checkbox" id="keep-hinting" name="keep-hinting">
+                    <label for="keep-hinting">保留提示信息（hinting）</label>
+                </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="ignore-errors" name="ignore-errors" checked>
+                    <label for="ignore-errors">忽略错误（保留问题字形）</label>
+                </div>
+                <div class="checkbox-container">
+                    <input type="checkbox" id="keep-vars" name="keep-vars">
+                    <label for="keep-vars">保留可变字体功能</label>
+                </div>
+            </div>
+            
+            <button id="process-btn" disabled>处理字体</button>
+        </div>
+        
+        <div id="status" class="status hidden"></div>
+        
+        <div id="result-section" class="result-section hidden">
+            <h2>处理结果</h2>
+            <div class="result-info">
+                <p>字体处理已完成！</p>
+                <p id="run-id"></p>
+                <p>请点击下方链接查看 GitHub Action 运行详情，完成后可下载处理后的字体:</p>
+            </div>
+            <div class="buttons">
+                <a id="action-link" href="#" target="_blank" class="btn btn-primary">查看运行详情</a>
+                <button id="check-status-btn" class="btn btn-secondary">检查处理状态</button>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>使用 <a href="https://github.com/features/actions" target="_blank">GitHub Actions</a> 提供支持 | 
+        <a href="https://github.com/YOUR_USERNAME/YOUR_REPO" target="_blank">查看源码</a></p>
+    </footer>
+
+    <script src="script.js"></script>
+</body>
+</html>
