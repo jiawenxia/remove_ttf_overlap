@@ -39,7 +39,7 @@ jobs:
       
       # 添加文件上传步骤
       - name: Upload Font File
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: input-font
           path: .
@@ -92,7 +92,7 @@ jobs:
             ${{ inputs.keepVars && '--keep-vars' || '' }}
           
       - name: Upload processed font
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: processed-font
           path: processed_${{ steps.process_font.outputs.filename }}
