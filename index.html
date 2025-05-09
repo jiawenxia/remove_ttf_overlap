@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>字体去重叠工具</title>
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
     <div class="container">
@@ -34,9 +35,38 @@
                     <input type="checkbox" id="keep-vars" name="keep-vars">
                     <label for="keep-vars">保留可变字体功能</label>
                 </div>
+                
+                <div class="token-input-container">
+                    <label for="github-token">GitHub Personal Access Token:</label>
+                    <input type="password" id="github-token" name="github-token" placeholder="输入您的 GitHub Token">
+                    <span class="help-text">
+                        <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=Font%20Processing%20Tool" target="_blank">
+                            如何创建 Token? <i class="fas fa-external-link-alt"></i>
+                        </a>
+                    </span>
+                </div>
+                
+                <div class="token-info">
+                    <p><i class="fas fa-info-circle"></i> 您的 Token 不会被存储在任何服务器上，仅用于直接与 GitHub API 通信。</p>
+                </div>
             </div>
             
             <button id="process-btn" disabled>处理字体</button>
+        </div>
+        
+        <div class="info-box token-help-box">
+            <h3>为什么需要 GitHub Token?</h3>
+            <p>为了处理您的字体文件，我们需要在 GitHub Actions 上运行一个工作流。出于安全原因，我们需要您提供自己的 GitHub Token 来进行此操作。</p>
+            
+            <h4>如何获取 GitHub Token:</h4>
+            <ol>
+                <li>前往 <a href="https://github.com/settings/tokens/new?scopes=repo,workflow&description=Font%20Processing%20Tool" target="_blank">GitHub Token 创建页面</a></li>
+                <li>如果需要，登录您的 GitHub 账户</li>
+                <li>确保选中 "repo" 和 "workflow" 权限</li>
+                <li>点击底部的 "Generate token" 按钮</li>
+                <li>复制生成的 token 并粘贴到上方的输入框中</li>
+            </ol>
+            <p><strong>注意:</strong> 您的 token 不会被保存到任何服务器，仅用于直接调用 GitHub API。</p>
         </div>
         
         <div id="status" class="status hidden"></div>
@@ -44,7 +74,7 @@
         <div id="result-section" class="result-section hidden">
             <h2>处理结果</h2>
             <div class="result-info">
-                <p>字体处理已完成！</p>
+                <p>字体处理已启动！</p>
                 <p id="run-id"></p>
                 <p>请点击下方链接查看 GitHub Action 运行详情，完成后可下载处理后的字体:</p>
             </div>
@@ -57,7 +87,7 @@
 
     <footer>
         <p>使用 <a href="https://github.com/features/actions" target="_blank">GitHub Actions</a> 提供支持 | 
-        <a href="https://github.com/jiawenxia/remove_ttf_overlap" target="_blank">查看源码</a>
+        <a href="https://github.com/jiawenxia/remove_ttf_overlap" target="_blank">查看源码</a></p>
     </footer>
 
     <script src="script.js"></script>

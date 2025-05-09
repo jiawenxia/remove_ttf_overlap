@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let selectedFile = null;
     let currentWorkflowRunId = null;
-    let repoOwner = 'jiawenxia'; // 替换为您的GitHub用户名
-    let repoName = 'remove_ttf_overlap'; // 替换为您的仓库名
+    let repoOwner = 'jiawenxia'; // 替换为你的GitHub用户名
+    let repoName = 'remove_ttf_overlap'; // 替换为你的仓库名
     
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
@@ -28,6 +28,14 @@ document.addEventListener('DOMContentLoaded', function() {
     processBtn.addEventListener('click', async function() {
         if (!selectedFile) return;
         
+        // 获取用户的 GitHub Token
+        const githubToken = document.getElementById('github-token').value.trim();
+        
+        if (!githubToken) {
+            showStatus('error', '请输入 GitHub Token 才能处理字体。');
+            return;
+        }
+        
         // 显示处理状态
         showStatus('info', '正在上传字体文件...');
         processBtn.disabled = true;
@@ -42,25 +50,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const keepVars = document.getElementById('keep-vars').checked;
             
             // 创建GitHub Action的输入参数
-            const params = new URLSearchParams({
-                fontBase64: base64Font,
-                fileName: selectedFile.name,
-                keepHinting: keepHinting,
-                ignoreErrors: ignoreErrors,
-                keepVars: keepVars
-            });
-            
-            // 此处需要一个代理服务器来触发GitHub Action
-            // 因为浏览器直接调用GitHub API会有CORS问题
-            // 这里使用一个示例API端点
-            showStatus('info', '正在触发字体处理...');
-            
-            // 在实际部署中，你需要创建一个GitHub App或第三方服务来处理这一步
-            // 以下是一个简化的示例，假设有一个API可用
-            // 替换为以下代码
-            const githubToken = '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'; // 注意：在生产环境中应该从安全的来源获取
             const workflowData = {
-                ref: 'main', // 你的分支名
+                ref: 'main', // 您的主分支名
                 inputs: {
                     fontBase64: base64Font,
                     fileName: selectedFile.name,
@@ -69,7 +60,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     keepVars: keepVars.toString()
                 }
             };
-
+            
+            showStatus('info', '正在触发字体处理...');
+            
+            // 使用用户提供的 token 调用 GitHub API
             const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/dispatches`, {
                 method: 'POST',
                 headers: {
@@ -80,12 +74,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(workflowData)
             });
             
-            if (!response.ok) {
-                throw new Error('无法触发工作流');
+            // GitHub 的工作流调度 API 通常返回 204 No Content
+            if (response.status !== 204) {
+                throw new Error(`GitHub API 返回了状态码 ${response.status}`);
             }
             
-            const data = await response.json();
-            currentWorkflowRunId = data.run_id;
+            // 获取最新的工作流运行信息
+            const runsResponse = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/runs`, {
+                headers: {
+                    'Authorization': `token ${githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+            
+            if (!runsResponse.ok) {
+                throw new Error('无法获取工作流运行信息');
+            }
+            
+            const runsData = await runsResponse.json();
+            if (runsData.workflow_runs && runsData.workflow_runs.length > 0) {
+                currentWorkflowRunId = runsData.workflow_runs[0].id;
+            } else {
+                currentWorkflowRunId = 'unknown';
+            }
             
             // 显示结果区域
             resultSection.classList.remove('hidden');
@@ -100,17 +111,35 @@ document.addEventListener('DOMContentLoaded', function() {
             console.error('处理错误:', error);
             showStatus('error', '处理失败: ' + error.message);
             processBtn.disabled = false;
+        } finally {
+            // 清除输入的 token，增加安全性
+            document.getElementById('github-token').value = '';
         }
     });
     
     checkStatusBtn.addEventListener('click', async function() {
-        if (!currentWorkflowRunId) return;
+        if (!currentWorkflowRunId || currentWorkflowRunId === 'unknown') {
+            showStatus('error', '无法检查状态：未知的工作流运行ID');
+            return;
+        }
+        
+        // 获取用户的 GitHub Token
+        const githubToken = document.getElementById('github-token').value.trim();
+        
+        if (!githubToken) {
+            showStatus('error', '请输入 GitHub Token 才能检查状态。');
+            return;
+        }
         
         showStatus('info', '正在检查处理状态...');
         
         try {
-            // 同样，在实际部署中需要一个代理服务
-            const response = await fetch(`https://api.example.com/check-workflow-status?run_id=${currentWorkflowRunId}`);
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}`, {
+                headers: {
+                    'Authorization': `token ${githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
             
             if (!response.ok) {
                 throw new Error('无法获取工作流状态');
@@ -121,10 +150,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.status === 'completed' && data.conclusion === 'success') {
                 showStatus('success', '字体处理完成！可以从GitHub Action页面下载处理后的字体。');
                 
-                // 添加直接下载链接（如果GitHub Action工作流配置了上传处理后的字体）
-                const downloadUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}/artifacts`;
-                actionLinkElement.href = downloadUrl;
-                actionLinkElement.textContent = '下载处理后的字体';
+                // 获取生成的字体文件
+                const artifactsUrl = `https://api.github.com/repos/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}/artifacts`;
+                const artifactsResponse = await fetch(artifactsUrl, {
+                    headers: {
+                        'Authorization': `token ${githubToken}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                if (artifactsResponse.ok) {
+                    const artifactsData = await artifactsResponse.json();
+                    if (artifactsData.artifacts && artifactsData.artifacts.length > 0) {
+                        const downloadUrl = `https://github.com/${repoOwner}/${repoName}/actions/runs/${currentWorkflowRunId}/artifacts/${artifactsData.artifacts[0].id}`;
+                        actionLinkElement.href = downloadUrl;
+                        actionLinkElement.textContent = '下载处理后的字体';
+                    }
+                }
                 
                 checkStatusBtn.classList.add('hidden');
             } else if (data.status === 'completed') {
@@ -136,6 +178,9 @@ document.addEventListener('DOMContentLoaded', function() {
         } catch (error) {
             console.error('检查状态错误:', error);
             showStatus('error', '检查状态失败: ' + error.message);
+        } finally {
+            // 清除输入的 token，增加安全性
+            document.getElementById('github-token').value = '';
         }
     });
     
