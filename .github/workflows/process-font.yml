@@ -41,4 +41,33 @@ jobs:
           pip install fonttools
           pip install skia-pathops
           
-      - name: Save
+      - name: Save font from Base64
+        run: |
+          echo "${{ github.event.inputs.fontBase64 }}" > input_base64.txt
+          
+      - name: Process font
+        run: |
+          python scripts/remove_overlaps.py \
+            --from-base64 \
+            input_base64.txt \
+            processed_${{ github.event.inputs.fileName }} \
+            ${{ github.event.inputs.keepHinting == 'true' && '--keep-hinting' || '' }} \
+            ${{ github.event.inputs.ignoreErrors == 'true' && '--ignore-errors' || '' }} \
+            ${{ github.event.inputs.keepVars == 'true' && '--keep-vars' || '' }}
+          
+      - name: Upload processed font
+        uses: actions/upload-artifact@v3
+        with:
+          name: processed-font
+          path: processed_${{ github.event.inputs.fileName }}
+          
+      - name: Create summary
+        run: |
+          echo "## 字体处理完成 ✅" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "处理的字体: **${{ github.event.inputs.fileName }}**" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "选项:" >> $GITHUB_STEP_SUMMARY
+          echo "- 保留提示信息: ${{ github.event.inputs.keepHinting }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 忽略错误: ${{ github.event.inputs.ignoreErrors }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 保留可变字体功能: ${{ github.event.inputs.keepVars }}" >> $GITHUB_STEP_SUMMARY
