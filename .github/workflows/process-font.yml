@@ -3,25 +3,21 @@ name: Process Font
 on:
   workflow_dispatch:
     inputs:
-      fontBase64:
-        description: 'Base64 encoded font'
-        required: true
-      fileName:
-        description: 'Font file name'
-        required: true
-        default: 'font.ttf'
       keepHinting:
-        description: 'Keep hinting'
+        description: '保留提示信息（hinting）'
         required: false
-        default: 'false'
+        default: false
+        type: boolean
       ignoreErrors:
-        description: 'Ignore errors'
+        description: '忽略错误（保留问题字形）'
         required: false
-        default: 'true'
+        default: true
+        type: boolean
       keepVars:
-        description: 'Keep variable font features'
+        description: '保留可变字体功能'
         required: false
-        default: 'false'
+        default: false
+        type: boolean
 
 jobs:
   process:
@@ -40,34 +36,76 @@ jobs:
           python -m pip install --upgrade pip
           pip install fonttools
           pip install skia-pathops
-          
-      - name: Save font from Base64
+      
+      # 添加文件上传步骤
+      - name: Upload Font File
+        uses: actions/upload-artifact@v2
+        with:
+          name: input-font
+          path: .
+          retention-days: 1
+        
+      # 下载用户上传的字体
+      - name: Wait for font upload
         run: |
-          echo "${{ github.event.inputs.fontBase64 }}" > input_base64.txt
+          echo "请通过 Actions 页面上传您的字体文件"
+          echo "上传完成后，字体处理将自动继续"
+          echo "上传步骤指南已添加到工作流汇总中"
           
-      - name: Process font
+      - name: Create upload instructions
         run: |
+          echo "## 请上传您的字体文件 ⬆️" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "1. 在当前运行的 Actions 页面，点击 **'Upload Font File'** 步骤右上角的 ⚙️ 图标" >> $GITHUB_STEP_SUMMARY
+          echo "2. 在弹出的 'Upload Artifact' 对话框中，点击 **'Browse your Computer'**" >> $GITHUB_STEP_SUMMARY
+          echo "3. 选择您要处理的字体文件（.ttf 或 .otf 格式）" >> $GITHUB_STEP_SUMMARY
+          echo "4. 点击 **'Upload Artifact'** 按钮" >> $GITHUB_STEP_SUMMARY
+          echo "5. 等待上传完成，处理将自动继续" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**注意:** 上传的字体文件将在处理完成后自动删除" >> $GITHUB_STEP_SUMMARY
+          
+      - name: Process uploaded font
+        id: process_font
+        run: |
+          # 获取上传的字体文件列表
+          FONT_FILES=$(find . -maxdepth 1 -type f \( -name "*.ttf" -o -name "*.otf" \) | head -1)
+          
+          if [ -z "$FONT_FILES" ]; then
+            echo "未找到上传的字体文件（.ttf 或 .otf）"
+            exit 1
+          fi
+          
+          # 获取第一个字体文件
+          FONT_FILE=$(echo $FONT_FILES | head -1)
+          echo "处理字体文件: $FONT_FILE"
+          
+          # 提取文件名（不含路径）
+          FILENAME=$(basename "$FONT_FILE")
+          echo "filename=$FILENAME" >> $GITHUB_OUTPUT
+          
+          # 处理字体
           python scripts/remove_overlaps.py \
-            --from-base64 \
-            input_base64.txt \
-            processed_${{ github.event.inputs.fileName }} \
-            ${{ github.event.inputs.keepHinting == 'true' && '--keep-hinting' || '' }} \
-            ${{ github.event.inputs.ignoreErrors == 'true' && '--ignore-errors' || '' }} \
-            ${{ github.event.inputs.keepVars == 'true' && '--keep-vars' || '' }}
+            "$FONT_FILE" \
+            "processed_$FILENAME" \
+            ${{ inputs.keepHinting && '--keep-hinting' || '' }} \
+            ${{ inputs.ignoreErrors && '--ignore-errors' || '' }} \
+            ${{ inputs.keepVars && '--keep-vars' || '' }}
           
       - name: Upload processed font
-        uses: actions/upload-artifact@v4  # 修改这里 - 从 v3 改为 v4
+        uses: actions/upload-artifact@v2
         with:
           name: processed-font
-          path: processed_${{ github.event.inputs.fileName }}
+          path: processed_${{ steps.process_font.outputs.filename }}
           
       - name: Create summary
         run: |
           echo "## 字体处理完成 ✅" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "处理的字体: **${{ github.event.inputs.fileName }}**" >> $GITHUB_STEP_SUMMARY
+          echo "处理的字体: **${{ steps.process_font.outputs.filename }}**" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "选项:" >> $GITHUB_STEP_SUMMARY
-          echo "- 保留提示信息: ${{ github.event.inputs.keepHinting }}" >> $GITHUB_STEP_SUMMARY
-          echo "- 忽略错误: ${{ github.event.inputs.ignoreErrors }}" >> $GITHUB_STEP_SUMMARY
-          echo "- 保留可变字体功能: ${{ github.event.inputs.keepVars }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 保留提示信息: ${{ inputs.keepHinting }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 忽略错误: ${{ inputs.ignoreErrors }}" >> $GITHUB_STEP_SUMMARY
+          echo "- 保留可变字体功能: ${{ inputs.keepVars }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "点击上方的 'Artifacts' 部分下载处理后的字体文件" >> $GITHUB_STEP_SUMMARY
