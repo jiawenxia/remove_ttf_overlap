@@ -10,8 +10,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     let selectedFile = null;
     let currentWorkflowRunId = null;
-    let repoOwner = 'YOUR_USERNAME'; // 替换为你的GitHub用户名
-    let repoName = 'YOUR_REPO';      // 替换为你的仓库名
+    let repoOwner = 'jiawenxia'; // 替换为您的GitHub用户名
+    let repoName = 'remove_ttf_overlap'; // 替换为您的仓库名
     
     fileInput.addEventListener('change', function(e) {
         if (e.target.files.length > 0) {
@@ -57,8 +57,27 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 在实际部署中，你需要创建一个GitHub App或第三方服务来处理这一步
             // 以下是一个简化的示例，假设有一个API可用
-            const response = await fetch(`https://api.example.com/trigger-workflow?${params.toString()}`, {
-                method: 'POST'
+            // 替换为以下代码
+            const githubToken = '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'; // 注意：在生产环境中应该从安全的来源获取
+            const workflowData = {
+                ref: 'main', // 你的分支名
+                inputs: {
+                    fontBase64: base64Font,
+                    fileName: selectedFile.name,
+                    keepHinting: keepHinting.toString(),
+                    ignoreErrors: ignoreErrors.toString(),
+                    keepVars: keepVars.toString()
+                }
+            };
+
+            const response = await fetch(`https://api.github.com/repos/${repoOwner}/${repoName}/actions/workflows/process-font.yml/dispatches`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `token ${githubToken}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(workflowData)
             });
             
             if (!response.ok) {
